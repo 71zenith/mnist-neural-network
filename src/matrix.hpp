@@ -150,3 +150,13 @@ inline Matrix hadamard(const Matrix &A, const Matrix &B) {
     C.data[i] = A.data[i] * B.data[i];
   return C;
 }
+
+inline void sgdUpdate(Matrix &W, const Matrix &A, const Matrix &delta,
+                      double lr) {
+  for (size_t r = 0; r < A.rows; ++r)
+    for (size_t k = 0; k < W.rows; ++k) {
+      double a = A(r, k) * lr;
+      for (size_t j = 0; j < W.cols; ++j)
+        W(k, j) -= a * delta(r, j);
+    }
+}

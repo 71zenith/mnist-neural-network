@@ -20,13 +20,24 @@ public:
   NN(std::vector<Layer> layers, Loss loss_fn, std::size_t epoch)
       : epoch(epoch), loss_fn(loss_fn), layers(std::move(layers)) {}
 
-  void fit(Matrix &X, Matrix &y) {
+  void fit(const Matrix &X, const Matrix &y) {
+    static std::mt19937 gen(std::random_device{}());
+    std::vector<size_t> idx(X.rows);
+    std::iota(idx.begin(), idx.end(), 0);
+
     for (size_t e = 0; e < epoch; ++e) {
-      for (size_t i = 0; i < X.rows; ++i) {
+      std::shuffle(idx.begin(), idx.end(), gen);
+      double epoch_loss = 0.0;
+
+      for (size_t k = 0; k < X.rows; ++k) {
+        size_t i = idx[k];
         Matrix output = forward(X.row(i));
-        double cost = calculate_loss(output, y.row(i));
+        epoch_loss += calculate_loss(output, y.row(i));
         backward(y.row(i));
       }
+
+      loss = epoch_loss / X.rows;
+      printf("Epoch %zu/%zu  loss: %f\n", e + 1, epoch, loss);
     }
   }
 
@@ -59,15 +70,17 @@ public:
   void backward(const Matrix &y) {
     Matrix delta = activations.back() - y;
     for (size_t i = layers.size(); i-- > 0;) {
-      Matrix dW = transpose(activations[i]) * delta;
-      Matrix db = delta;
-      if (i > 0) {
-        Matrix next = delta * transpose(layers[i].weights);
+      Matrix next;
+      if (i > 0)
+        next = delta * transpose(layers[i].weights);
+
+      sgdUpdate(layers[i].weights, activations[i], delta, learning_rate);
+      for (size_t j = 0; j < delta.cols; ++j)
+        layers[i].biases(0, j) -= learning_rate * delta(0, j);
+
+      if (i > 0)
         delta =
             hadamard(next, activateD(layers[i - 1].activation, activations[i]));
-      }
-      layers[i].weights = layers[i].weights - dW * learning_rate;
-      layers[i].biases = layers[i].biases - db * learning_rate;
     }
   }
 };
